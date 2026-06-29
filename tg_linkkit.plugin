@@ -12,10 +12,15 @@ __id__ = "tg_linkkit"
 __name__ = "TG LinkKit"
 __description__ = "Копирует ссылки, mention, QR и Ultimate-карточку Telegram-профиля/чата."
 __author__ = "QZy / TG LinkKit"
-__version__ = "1.3.5"
+__version__ = "1.3.6"
 __icon__ = "QZy44/0"
 __app_version__ = ">=12.5.1"
 __sdk_version__ = ">=1.4.3.3"
+
+PROJECT_AUTHOR = "QZy"
+PROJECT_GITHUB = "https://github.com/QZy-inf/tg-linkkit"
+PROJECT_LICENSE = "MIT License"
+PROJECT_VPN_SITE = "https://connect.qzybot.space"
 
 LANG_RU = 0
 LANG_EN = 1
@@ -61,7 +66,7 @@ STRINGS = {
         "id": "ID",
         "close": "Закрыть",
         "best": "Лучшая ссылка",
-        "card": "Карточка Fuse",
+        "card": "Карточка LinkKit",
         "md": "Markdown mention",
         "html": "HTML mention",
         "deep": "tg://user?id",
@@ -86,6 +91,7 @@ STRINGS = {
         "reset_done": "Шаблон сброшен",
         "settings_how": "Открой чат → три точки → Плагины → TG LinkKit.",
         "ultimate_note": "Ultimate использует только данные, доступные текущему Telegram-клиенту.",
+        "copied_link": "Ссылка скопирована: ",
     },
     LANG_EN: {
         "menu_sub": "Copy link / mention / card",
@@ -124,6 +130,7 @@ STRINGS = {
         "reset_done": "Template reset",
         "settings_how": "Open chat → three dots → Plugins → TG LinkKit.",
         "ultimate_note": "Ultimate uses only data available to the current Telegram client.",
+        "copied_link": "Copied link: ",
     },
 }
 
@@ -576,7 +583,7 @@ def build_formats(entity, dialog_id, options=None):
     return name, username, entity_id, items
 
 
-class FuseLinkPlugin(BasePlugin):
+class TGLinkKitPlugin(BasePlugin):
     def on_plugin_load(self):
         self._last_sheet_error = ""
         self.add_menu_item(MenuItemData(
@@ -1044,8 +1051,38 @@ class FuseLinkPlugin(BasePlugin):
             self.set_setting("card_template", DEFAULT_TEMPLATE, reload_settings=True)
             BulletinHelper.show_success(tr(lang, "reset_done"))
 
+        def copy_about_link(label, value):
+            def handler(v=None):
+                copy_to_clipboard(value)
+                BulletinHelper.show_success(tr(lang, "copied_link") + label)
+            return handler
+
         return [
             Header(text="TG LinkKit"),
+            Text(
+                text="by QZy",
+                subtext="Open-source Telegram link toolkit · MIT License",
+                icon="msg_info",
+            ),
+            Text(
+                text="GitHub",
+                subtext=PROJECT_GITHUB,
+                icon="msg_link",
+                on_click=copy_about_link("GitHub", PROJECT_GITHUB),
+            ),
+            Text(
+                text="QZy VPN",
+                subtext=PROJECT_VPN_SITE,
+                icon="msg_channel",
+                on_click=copy_about_link("QZy VPN", PROJECT_VPN_SITE),
+            ),
+            Text(
+                text="License",
+                subtext=PROJECT_LICENSE,
+                icon="msg_permissions",
+                on_click=copy_about_link("MIT License", PROJECT_LICENSE),
+            ),
+            Divider(),
             Selector(
                 key="lang",
                 text="Язык / Language",
@@ -1087,7 +1124,7 @@ class FuseLinkPlugin(BasePlugin):
                 default=False,
             ),
             Text(text="Лучшая ссылка: t.me если есть username, иначе tg://user?id.", icon="msg_link"),
-            Text(text="Карточка Fuse: имя, тип, username, profile, id и deep link.", icon="msg_contact"),
+            Text(text="Карточка LinkKit: имя, тип, username, profile, id и deep link.", icon="msg_contact"),
             Text(text="Mention: Markdown и HTML для вставки в форматированный текст.", icon="msg_quote"),
             Divider(),
             Header(text="Ultimate & QR"),
@@ -1139,7 +1176,7 @@ class FuseLinkPlugin(BasePlugin):
             ),
             Text(
                 text="Сбросить шаблон",
-                subtext="Вернёт стандартный QZY template",
+                subtext="Вернёт стандартный LinkKit template",
                 icon="msg_reset",
                 on_click=reset_template,
             ),

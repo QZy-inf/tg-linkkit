@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.6 - 2026-06-29
+
+- Added About block inside plugin settings.
+- Added visible GitHub link in plugin settings.
+- Added author, license and QZy VPN links to plugin settings.
+- Fixed remaining old card/template wording.
+
 ## 1.3.5 - 2026-06-29
 
 - Final public branding: TG LinkKit.
