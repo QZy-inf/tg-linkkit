@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.7 - 2026-06-29
+
+- Updated plugin author to `@qzy_moderator`.
+- Added updates channel: `https://t.me/QZyinfo`.
+- Added support contact: `https://t.me/Qvless`.
+- Added QZy VPN bot link: `https://t.me/QZy_vpn_bot`.
+
 ## 1.3.6 - 2026-06-29
 
 - Added About block inside plugin settings.

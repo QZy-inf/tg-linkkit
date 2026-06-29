@@ -2,7 +2,7 @@
 
 Compact Telegram client plugin for copying profile and chat links.
 
-![version](https://img.shields.io/badge/version-1.3.6-black)
+![version](https://img.shields.io/badge/version-1.3.7-black)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![runtime](https://img.shields.io/badge/plugin%20SDK-%3E%3D1.4.3.3-2ea44f)
 
@@ -59,13 +59,17 @@ It only reads the current Telegram client context and copies selected text to yo
 ## Author
 
 - Author: QZy
+- Telegram: https://t.me/qzy_moderator
 - GitHub: https://github.com/QZy-inf/tg-linkkit
+- Updates: https://t.me/QZyinfo
+- Support: https://t.me/Qvless
 - QZy VPN: https://connect.qzybot.space
+- QZy VPN Bot: https://t.me/QZy_vpn_bot
 - License: MIT
 
 ## Version
 
-Current version: `1.3.6`
+Current version: `1.3.7`
 
 ## License
 

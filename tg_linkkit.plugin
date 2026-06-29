@@ -11,16 +11,19 @@ from urllib.parse import quote
 __id__ = "tg_linkkit"
 __name__ = "TG LinkKit"
 __description__ = "Копирует ссылки, mention, QR и Ultimate-карточку Telegram-профиля/чата."
-__author__ = "QZy / TG LinkKit"
-__version__ = "1.3.6"
+__author__ = "@qzy_moderator"
+__version__ = "1.3.7"
 __icon__ = "QZy44/0"
 __app_version__ = ">=12.5.1"
 __sdk_version__ = ">=1.4.3.3"
 
-PROJECT_AUTHOR = "QZy"
+PROJECT_AUTHOR = "@qzy_moderator"
 PROJECT_GITHUB = "https://github.com/QZy-inf/tg-linkkit"
 PROJECT_LICENSE = "MIT License"
+PROJECT_CHANNEL = "https://t.me/QZyinfo"
+PROJECT_SUPPORT = "https://t.me/Qvless"
 PROJECT_VPN_SITE = "https://connect.qzybot.space"
+PROJECT_VPN_BOT = "https://t.me/QZy_vpn_bot"
 
 LANG_RU = 0
 LANG_EN = 1
@@ -1060,9 +1063,10 @@ class TGLinkKitPlugin(BasePlugin):
         return [
             Header(text="TG LinkKit"),
             Text(
-                text="by QZy",
+                text="by @qzy_moderator",
                 subtext="Open-source Telegram link toolkit · MIT License",
                 icon="msg_info",
+                on_click=copy_about_link("Author", PROJECT_AUTHOR),
             ),
             Text(
                 text="GitHub",
@@ -1071,10 +1075,28 @@ class TGLinkKitPlugin(BasePlugin):
                 on_click=copy_about_link("GitHub", PROJECT_GITHUB),
             ),
             Text(
+                text="Updates",
+                subtext=PROJECT_CHANNEL,
+                icon="msg_channel",
+                on_click=copy_about_link("Updates", PROJECT_CHANNEL),
+            ),
+            Text(
+                text="Support",
+                subtext="@Qvless",
+                icon="msg_discussion",
+                on_click=copy_about_link("Support", PROJECT_SUPPORT),
+            ),
+            Text(
                 text="QZy VPN",
                 subtext=PROJECT_VPN_SITE,
                 icon="msg_channel",
                 on_click=copy_about_link("QZy VPN", PROJECT_VPN_SITE),
+            ),
+            Text(
+                text="QZy VPN Bot",
+                subtext="@QZy_vpn_bot",
+                icon="msg_bot",
+                on_click=copy_about_link("QZy VPN Bot", PROJECT_VPN_BOT),
             ),
             Text(
                 text="License",
