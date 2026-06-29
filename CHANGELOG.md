@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.8 - 2026-06-29
+
+- Fixed `show_id = false` privacy behavior: numeric IDs/deep links no longer leak through Best link, QR, Markdown/HTML mention, menu headers or debug.
+- Replaced external QR image URL flow with native Telegram QR best-effort and clipboard fallback.
+- Removed third-party QR API usage from the plugin runtime.
+- Switched JSON-lite card output to safe `json.dumps(..., ensure_ascii=False, indent=2)`.
+- Softened Ultimate dossier wording around visible client data and Bot API.
+- Improved username enrichment for chats/channels when the initial client context is minimal.
+
 ## 1.3.7 - 2026-06-29
 
 - Updated plugin author to `@qzy_moderator`.

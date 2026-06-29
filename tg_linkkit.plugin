@@ -6,13 +6,13 @@ from ui.bulletin import BulletinHelper
 from ui.settings import Header, Divider, Text, Selector, Input, Switch
 from org.telegram.messenger import AndroidUtilities
 from org.telegram.ui.ActionBar import Theme
-from urllib.parse import quote
+import json
 
 __id__ = "tg_linkkit"
 __name__ = "TG LinkKit"
 __description__ = "Копирует ссылки, mention, QR и Ultimate-карточку Telegram-профиля/чата."
 __author__ = "@qzy_moderator"
-__version__ = "1.3.7"
+__version__ = "1.3.8"
 __icon__ = "QZy44/0"
 __app_version__ = ">=12.5.1"
 __sdk_version__ = ">=1.4.3.3"
@@ -45,7 +45,7 @@ DEFAULT_ACTIONS = [
     "Копировать HTML mention",
     "Копировать ID",
     "Копировать Ultimate dossier",
-    "Копировать QR-ссылку",
+    "Открыть Telegram QR",
 ]
 
 CARD_CLASSIC = 0
@@ -78,7 +78,10 @@ STRINGS = {
         "resolve": "tg://resolve",
         "debug": "Debug",
         "ultimate": "Ultimate dossier",
-        "qr": "QR image URL",
+        "qr": "Telegram QR",
+        "qr_opened": "QR открыт",
+        "qr_fallback": "QR недоступен, ссылка скопирована",
+        "no_qr": "Нет ссылки для QR",
         "diagnostics": "Диагностика доступности",
         "disabled": " — недоступно",
         "user": "user",
@@ -93,7 +96,7 @@ STRINGS = {
         "preview_done": "Пример карточки скопирован",
         "reset_done": "Шаблон сброшен",
         "settings_how": "Открой чат → три точки → Плагины → TG LinkKit.",
-        "ultimate_note": "Ultimate использует только данные, доступные текущему Telegram-клиенту.",
+        "ultimate_note": "Ultimate использует только данные, уже доступные вашему Telegram-клиенту. Скрытые данные не раскрываются, Bot API не используется.",
         "copied_link": "Ссылка скопирована: ",
     },
     LANG_EN: {
@@ -117,7 +120,10 @@ STRINGS = {
         "resolve": "tg://resolve",
         "debug": "Debug",
         "ultimate": "Ultimate dossier",
-        "qr": "QR image URL",
+        "qr": "Telegram QR",
+        "qr_opened": "QR opened",
+        "qr_fallback": "QR is unavailable, link copied",
+        "no_qr": "No link for QR",
         "diagnostics": "Availability diagnostics",
         "disabled": " — unavailable",
         "user": "user",
@@ -132,7 +138,7 @@ STRINGS = {
         "preview_done": "Sample card copied",
         "reset_done": "Template reset",
         "settings_how": "Open chat → three dots → Plugins → TG LinkKit.",
-        "ultimate_note": "Ultimate uses only data available to the current Telegram client.",
+        "ultimate_note": "Ultimate uses only data already available to your Telegram client. Hidden data is not exposed, Bot API is not used.",
         "copied_link": "Copied link: ",
     },
 }
@@ -323,18 +329,6 @@ def compact_value(value):
     return value
 
 
-def build_qr_url(target, size):
-    target = safe_str(target).strip()
-    if not target:
-        return ""
-    size = safe_int(size, 512)
-    if size < 128:
-        size = 128
-    if size > 1024:
-        size = 1024
-    return "https://api.qrserver.com/v1/create-qr-code/?size={0}x{0}&data={1}".format(size, quote(target, safe=""))
-
-
 def collect_entity_facts(entity, lang, include_raw):
     if not entity:
         return []
@@ -408,7 +402,7 @@ def build_diagnostics(values, lang):
         "Deep mention: " + bool_text(bool(values["deep"]), lang),
         "Markdown mention: " + bool_text(bool(values["mention_md"]), lang),
         "HTML mention: " + bool_text(bool(values["mention_html"]), lang),
-        "QR target: " + values["qr_target"],
+        "QR target: " + (values["qr_target"] or "-"),
         "",
         tr(lang, "ultimate_note"),
     ]
@@ -430,7 +424,7 @@ def build_ultimate_dossier(values, facts, lang):
         "Profile: " + (values["profile"] or "-"),
         "Deep: " + (values["deep"] or "-"),
         "Resolve: " + (values["resolve"] or "-"),
-        "QR: " + (values["qr"] or "-"),
+        "QR target: " + (values["qr_target"] or "-"),
         "",
         "Mentions",
         "Markdown: " + values["mention_md"],
@@ -486,17 +480,14 @@ def build_card(values, style, template):
             lines.append("<b>Deep:</b> <code>" + escape_html(values["deep"]) + "</code>")
         return "\n".join(lines)
     if style == CARD_JSON:
-        lines = [
-            "{",
-            '  "name": "' + values["name"].replace('"', '\\"') + '",',
-            '  "type": "' + values["type"].replace('"', '\\"') + '",',
-            '  "username": "' + values["at_username"].replace('"', '\\"') + '",',
-            '  "profile": "' + values["profile"].replace('"', '\\"') + '",',
-            '  "id": "' + values["id"].replace('"', '\\"') + '",',
-            '  "deep": "' + values["deep"].replace('"', '\\"') + '"',
-            "}",
-        ]
-        return "\n".join(lines)
+        return json.dumps({
+            "name": values["name"],
+            "type": values["type"],
+            "username": values["at_username"],
+            "profile": values["profile"],
+            "id": values["id"],
+            "deep": values["deep"],
+        }, ensure_ascii=False, indent=2)
     return apply_template(template or DEFAULT_TEMPLATE, values)
 
 
@@ -508,8 +499,6 @@ def build_formats(entity, dialog_id, options=None):
     include_ultimate_raw = bool(options.get("include_ultimate_raw", False))
     card_style = safe_int(options.get("card_style", CARD_CLASSIC), CARD_CLASSIC)
     card_template = safe_str(options.get("card_template", "")) or DEFAULT_TEMPLATE
-    qr_size = safe_int(options.get("qr_size", 512), 512)
-
     entity_id = get_entity_id(entity, dialog_id)
     username = get_entity_username(entity)
     name = display_name(entity)
@@ -521,7 +510,7 @@ def build_formats(entity, dialog_id, options=None):
     resolve = "tg://resolve?domain=" + username if username else ""
     deep = "tg://user?id=" + str(entity_id) if user_like and entity_id else ""
 
-    if user_like and entity_id:
+    if user_like and entity_id and show_id:
         mention_md = "[" + escape_markdown(name) + "](tg://user?id=" + str(entity_id) + ")"
         mention_html = '<a href="tg://user?id=' + str(entity_id) + '">' + escape_html(name) + "</a>"
     elif username:
@@ -531,9 +520,9 @@ def build_formats(entity, dialog_id, options=None):
         mention_md = name
         mention_html = escape_html(name)
 
-    best = tme or deep or at_username or name
-    qr_target = tme or deep or resolve or best
-    qr_url = build_qr_url(qr_target, qr_size)
+    deep_public = deep if show_id else ""
+    best = tme or deep_public or at_username or ""
+    qr_target = tme or deep_public or resolve
 
     values = {
         "name": name,
@@ -543,10 +532,10 @@ def build_formats(entity, dialog_id, options=None):
         "username_line": at_username or "-",
         "profile": tme or "-",
         "id": str(entity_id) if entity_id and show_id else "",
-        "deep": deep if show_id else "",
+        "deep": deep_public,
         "resolve": resolve,
         "best": best,
-        "qr": qr_url,
+        "qr": qr_target,
         "qr_target": qr_target,
         "mention_md": mention_md,
         "mention_html": mention_html,
@@ -561,17 +550,17 @@ def build_formats(entity, dialog_id, options=None):
         "name=" + name,
         "kind=" + kind,
         "dialog_id=" + safe_str(dialog_id),
-        "entity_id=" + safe_str(entity_id),
+        "entity_id=" + (safe_str(entity_id) if show_id else "hidden"),
         "username_set=" + safe_str(bool(username)),
         "qr_target_set=" + safe_str(bool(qr_target)),
         "entity_class=" + (type(entity).__name__ if entity else "None"),
     ])
 
     items = [
-        (tr(lang, "best"), best, True, "best"),
+        (tr(lang, "best"), best, bool(best), "best"),
         (tr(lang, "ultimate"), ultimate, True, "ultimate"),
         (tr(lang, "card"), card, True, "card"),
-        (tr(lang, "qr"), qr_url, bool(qr_url), "qr"),
+        (tr(lang, "qr"), qr_target, bool(qr_target), "qr"),
         (tr(lang, "md"), mention_md, True, "md"),
         (tr(lang, "html"), mention_html, True, "html"),
         (tr(lang, "deep"), deep if show_id else "", bool(deep and show_id), "deep"),
@@ -658,11 +647,19 @@ class TGLinkKitPlugin(BasePlugin):
         if not entity_id:
             return None
         controller = get_messages_controller()
-        for method_name in ["getUserFull", "getUser"]:
+
+        if is_user_entity(entity, dialog_id):
+            method_names = ["getUserFull", "getUser"]
+            lookup_id = entity_id
+        else:
+            method_names = ["getChatFull", "getChat"]
+            lookup_id = abs(entity_id)
+
+        for method_name in method_names:
             try:
                 method = getattr(controller, method_name)
-                result = method(entity_id)
-                candidate = getattr(result, "user", result)
+                result = method(lookup_id)
+                candidate = getattr(result, "user", None) or getattr(result, "chat", None) or result
                 if candidate and get_entity_username(candidate):
                     return candidate
             except Exception:
@@ -677,7 +674,6 @@ class TGLinkKitPlugin(BasePlugin):
             "show_id": self.get_setting("show_id", True),
             "show_debug": self.get_setting("show_debug", False),
             "include_ultimate_raw": self.get_setting("include_ultimate_raw", False),
-            "qr_size": self.get_setting("qr_size", 512),
         }
 
     def copy_value(self, label, value, lang):
@@ -687,6 +683,72 @@ class TGLinkKitPlugin(BasePlugin):
         copy_to_clipboard(value)
         BulletinHelper.show_success(tr(lang, "copied") + label)
         return True
+
+    def show_native_qr(self, value, lang):
+        value = safe_str(value).strip()
+        if not value:
+            BulletinHelper.show_error(tr(lang, "no_qr"))
+            return False
+        try:
+            from java import jclass
+            QRCodeBottomSheet = jclass("org.telegram.ui.Components.QRCodeBottomSheet")
+        except Exception as e:
+            log("tg_linkkit: QRCodeBottomSheet class unavailable: " + str(e))
+            return False
+
+        fragment = get_last_fragment()
+        act = None
+        try:
+            act = fragment.getParentActivity() if fragment else None
+        except Exception:
+            pass
+
+        title = "TG LinkKit"
+        candidates = []
+        if fragment:
+            candidates.extend([
+                (fragment, title, value, "", False),
+                (fragment, title, value, False),
+                (fragment, title, value),
+            ])
+        if act:
+            candidates.extend([
+                (act, title, value, "", False),
+                (act, title, value, False),
+                (act, title, value),
+                (act, value),
+            ])
+        candidates.append((value,))
+
+        last_error = ""
+        for args in candidates:
+            try:
+                sheet = QRCodeBottomSheet(*args)
+                try:
+                    sheet.show()
+                except Exception:
+                    if fragment:
+                        fragment.showDialog(sheet)
+                    else:
+                        raise
+                BulletinHelper.show_success(tr(lang, "qr_opened"))
+                return True
+            except Exception as e:
+                last_error = str(e)
+        log("tg_linkkit: native QR failed: " + last_error[:200])
+        return False
+
+    def perform_action(self, label, value, key, lang):
+        if key == "qr":
+            if self.show_native_qr(value, lang):
+                return True
+            if value:
+                copy_to_clipboard(value)
+                BulletinHelper.show_success(tr(lang, "qr_fallback"))
+                return True
+            BulletinHelper.show_error(tr(lang, "no_qr"))
+            return False
+        return self.copy_value(label, value, lang)
 
     def quick_action_key(self):
         action = safe_int(self.get_setting("default_action", ACTION_MENU), ACTION_MENU)
@@ -725,7 +787,7 @@ class TGLinkKitPlugin(BasePlugin):
             if action_key:
                 for label, value, enabled, key in formats:
                     if key == action_key:
-                        self.copy_value(label, value if enabled else "", lang)
+                        self.perform_action(label, value if enabled else "", key, lang)
                         return
 
             if self.show_fuse_sheet(act, name, username, entity_id, formats, lang):
@@ -754,7 +816,7 @@ class TGLinkKitPlugin(BasePlugin):
             def on_item_click(builder, which):
                 try:
                     label, value, key = enabled_formats[which]
-                    if self.copy_value(label, value, lang):
+                    if self.perform_action(label, value, key, lang):
                         builder.dismiss()
                 except Exception as e:
                     log("tg_linkkit: copy error: " + str(e))
@@ -763,7 +825,7 @@ class TGLinkKitPlugin(BasePlugin):
             message = tr(lang, "target") + ": " + name
             if username:
                 message += "\n" + tr(lang, "username") + ": @" + username
-            if entity_id:
+            if entity_id and self.get_setting("show_id", True):
                 message += "\n" + tr(lang, "id") + ": " + str(entity_id)
             if self._last_sheet_error:
                 message += "\n\nUI fallback: " + self._last_sheet_error[:160]
@@ -785,7 +847,7 @@ class TGLinkKitPlugin(BasePlugin):
             "best": "рекомендуется",
             "ultimate": "полный набор",
             "card": "красиво",
-            "qr": "картинка",
+            "qr": "Telegram QR",
             "md": "Markdown",
             "html": "HTML",
             "deep": "deep link",
@@ -896,7 +958,7 @@ class TGLinkKitPlugin(BasePlugin):
             meta = []
             if username:
                 meta.append("@" + username)
-            if entity_id:
+            if entity_id and self.get_setting("show_id", True):
                 meta.append("ID " + str(entity_id))
             meta_line = TextView(act)
             meta_line.setText(" · ".join(meta) if meta else "Telegram entity")
@@ -914,8 +976,8 @@ class TGLinkKitPlugin(BasePlugin):
             actions = LinearLayout(act)
             actions.setOrientation(LinearLayout.VERTICAL)
 
-            def copy_and_close(label, value, enabled):
-                if enabled and self.copy_value(label, value, lang):
+            def copy_and_close(label, value, enabled, key):
+                if enabled and self.perform_action(label, value, key, lang):
                     try:
                         if sheet_holder[0]:
                             sheet_holder[0].dismiss()
@@ -985,13 +1047,13 @@ class TGLinkKitPlugin(BasePlugin):
                 row.addView(label_box, LinearLayout.LayoutParams(0, -2, 1.0))
 
                 arrow = TextView(act)
-                arrow.setText("copy")
+                arrow.setText("open" if key == "qr" else "copy")
                 arrow.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12)
                 arrow.setGravity(Gravity.END)
                 arrow.setTextColor(java_int_color(0xCCFFFFFF) if key == "ultimate" else get_theme_color("key_windowBackgroundWhiteGrayText", 0xFF888888))
                 row.addView(arrow)
 
-                row.setOnClickListener(OnClickListener(lambda v, l=label, val=value, en=enabled and bool(value): copy_and_close(l, val, en)))
+                row.setOnClickListener(OnClickListener(lambda v, l=label, val=value, en=enabled and bool(value), k=key: copy_and_close(l, val, en, k)))
 
                 lp_row = LinearLayout.LayoutParams(-1, -2)
                 lp_row.bottomMargin = dp(8)
@@ -1042,7 +1104,7 @@ class TGLinkKitPlugin(BasePlugin):
                 "deep": "tg://user?id=123456789",
                 "resolve": "tg://resolve?domain=qzy",
                 "best": "https://t.me/qzy",
-                "qr": build_qr_url("https://t.me/qzy", self.get_setting("qr_size", 512)),
+                "qr": "https://t.me/qzy",
                 "qr_target": "https://t.me/qzy",
                 "mention_md": "[QZy Example](tg://user?id=123456789)",
                 "mention_html": '<a href="tg://user?id=123456789">QZy Example</a>',
@@ -1145,14 +1207,14 @@ class TGLinkKitPlugin(BasePlugin):
                 subtext="Техническая строка для проверки, по умолчанию скрыта",
                 default=False,
             ),
-            Text(text="Лучшая ссылка: t.me если есть username, иначе tg://user?id.", icon="msg_link"),
+            Text(text="Лучшая ссылка: t.me если есть username, иначе tg://user?id только при включённом ID.", icon="msg_link"),
             Text(text="Карточка LinkKit: имя, тип, username, profile, id и deep link.", icon="msg_contact"),
             Text(text="Mention: Markdown и HTML для вставки в форматированный текст.", icon="msg_quote"),
             Divider(),
             Header(text="Ultimate & QR"),
             Text(
                 text="Ultimate dossier",
-                subtext="Копирует максимум доступных клиенту данных: ссылки, mention, ID, flags и диагностическую заметку.",
+                subtext="Копирует техническую карточку из данных, уже доступных вашему Telegram-клиенту.",
                 icon="msg_contact",
             ),
             Text(
@@ -1160,12 +1222,10 @@ class TGLinkKitPlugin(BasePlugin):
                 subtext=tr(lang, "ultimate_note"),
                 icon="msg_info",
             ),
-            Input(
-                key="qr_size",
-                text="QR size",
-                subtext="Размер картинки QR: 128-1024, по умолчанию 512",
+            Text(
+                text="Telegram QR",
+                subtext="Открывается нативный QR Telegram, если сборка клиента даёт доступ к QRCodeBottomSheet; иначе копируется ссылка.",
                 icon="msg_photo",
-                default="512",
             ),
             Switch(
                 key="include_ultimate_raw",
@@ -1264,3 +1324,6 @@ class TGLinkKitPlugin(BasePlugin):
             self.set_setting("show_debug", False)
             self.set_setting("include_ultimate_raw", False, reload_settings=True)
             BulletinHelper.show_success("Preset Ultimate applied" if lang == LANG_EN else "Пресет Ultimate применён")
+
+
+Plugin = TGLinkKitPlugin
